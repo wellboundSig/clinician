@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature Generator // Terminal</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="terminal-container">
+        <div class="terminal-header">
+            <div class="terminal-buttons">
+                <span class="btn-close"></span>
+                <span class="btn-minimize"></span>
+                <span class="btn-maximize"></span>
+            </div>
+            <div class="terminal-title">sig-generator -- bash</div>
+        </div>
+        
+        <div class="terminal-body">
+            <div class="output-section" id="logOutput">
+                <div class="log-line system">[SYSTEM] Signature Generator v1.0 initialized</div>
+                <div class="log-line system">[SYSTEM] Ready for input files...</div>
+            </div>
+            
+            <div class="input-section">
+                <div class="command-group">
+                    <div class="command-label">$ upload --hero-spreadsheet</div>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="heroFile" accept=".xlsx,.xls,.csv" class="file-input">
+                        <label for="heroFile" class="file-label">
+                            <span class="file-text" id="heroFileText">Select main employee spreadsheet...</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="command-group">
+                    <div class="command-label">$ upload --reference-sheets</div>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="refFiles" accept=".xlsx,.xls,.csv" multiple class="file-input">
+                        <label for="refFiles" class="file-label">
+                            <span class="file-text" id="refFilesText">Select reference spreadsheets (multiple)...</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="command-group">
+                    <div class="command-label">$ upload --email-txt</div>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="txtFiles" accept=".txt" multiple class="file-input">
+                        <label for="txtFiles" class="file-label">
+                            <span class="file-text" id="txtFilesText">Select TXT email files (multiple)...</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="command-group action-group">
+                    <button id="runBtn" class="terminal-btn" disabled>
+                        <span class="btn-prefix">$</span> run --generate-signatures
+                    </button>
+                    <button id="clearBtn" class="terminal-btn secondary">
+                        <span class="btn-prefix">$</span> clear --logs
+                    </button>
+                </div>
+                
+                <div class="status-bar">
+                    <span id="statusHero" class="status-item">HERO: --</span>
+                    <span id="statusRef" class="status-item">REF: 0</span>
+                    <span id="statusTxt" class="status-item">TXT: 0</span>
+                    <span id="statusGenerated" class="status-item generated">GENERATED: 0</span>
+                    <span id="statusSkipped" class="status-item skipped">SKIPPED: 0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
