@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyIcon = document.getElementById('copyIcon');
     const checkIcon = document.getElementById('checkIcon');
     const copyText = document.getElementById('copyText');
-    const submitBtn = form.querySelector('.submit-btn');
+    const submitBtn = form ? form.querySelector('.submit-btn') : null;
 
     let signaturesData = null;
 
@@ -22,14 +22,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function getSignaturesJsonPath() {
         const path = window.location.pathname;
         // Check if we're in a name subdirectory (e.g., /field/judex-belotte/)
-        if (path.match(/\/field\/[^/]+\/?$/)) {
+        if (path.match(/\/field\/[^/]+\/?$/) && !path.endsWith('/field/')) {
             return '../signatures.json';
         }
         return 'signatures.json';
     }
 
-    // Load signatures JSON on page load
+    // Load signatures JSON
     async function loadSignatures() {
+        if (signaturesData) return true; // Already loaded
+        
         try {
             const jsonPath = getSignaturesJsonPath();
             const response = await fetch(jsonPath);
@@ -59,12 +61,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const searchKey = `${searchLast}-${searchFirst}`;
 
         for (const sig of signaturesData.signatures) {
-            // Normalize the key for comparison
             const sigKey = normalize(sig.key);
-            
-            // Exact match
             if (sigKey === searchKey) {
-                return sig.content.replace(/\|/g, '\n');
+                return sig.content; // Content already has proper formatting
             }
         }
 
@@ -73,13 +72,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const sigKey = normalize(sig.key);
             const parts = sigKey.split('-');
             
-            // Check if lastName matches first part and firstName matches last part
             if (parts.length >= 2) {
                 const sigLast = parts[0];
                 const sigFirst = parts[parts.length - 1];
                 
                 if (sigLast === searchLast && sigFirst === searchFirst) {
-                    return sig.content.replace(/\|/g, '\n');
+                    return sig.content;
                 }
             }
         }
@@ -88,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const sig of signaturesData.signatures) {
             const sigKey = normalize(sig.key);
             if (sigKey.includes(searchFirst) && sigKey.includes(searchLast)) {
-                return sig.content.replace(/\|/g, '\n');
+                return sig.content;
             }
         }
 
@@ -105,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const sig of signaturesData.signatures) {
             const sigKey = normalize(sig.key);
             if (sigKey === normalizedSlug) {
-                return sig.content.replace(/\|/g, '\n');
+                return sig.content;
             }
         }
 
@@ -118,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let result = findSignature(firstName, lastName);
             if (result) return result;
 
-            // Try last-first (in case someone uses that format)
+            // Try last-first
             result = findSignature(lastName, firstName);
             if (result) return result;
         }
@@ -197,53 +195,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Form submission
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const firstName = firstNameInput.value.trim();
-        const lastName = lastNameInput.value.trim();
-        
-        if (!firstName || !lastName) {
-            showError('Please enter both first and last name');
-            return;
-        }
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const firstName = firstNameInput.value.trim();
+            const lastName = lastNameInput.value.trim();
+            
+            if (!firstName || !lastName) {
+                showError('Please enter both first and last name');
+                return;
+            }
 
-        hideResults();
+            hideResults();
 
-        // Wait for signatures to load if not yet loaded
-        if (!signaturesData) {
-            submitBtn.classList.add('loading');
-            submitBtn.disabled = true;
-            await loadSignatures();
-            submitBtn.classList.remove('loading');
-            submitBtn.disabled = false;
-        }
+            // Wait for signatures to load if not yet loaded
+            if (!signaturesData) {
+                if (submitBtn) {
+                    submitBtn.classList.add('loading');
+                    submitBtn.disabled = true;
+                }
+                await loadSignatures();
+                if (submitBtn) {
+                    submitBtn.classList.remove('loading');
+                    submitBtn.disabled = false;
+                }
+            }
 
-        const signature = findSignature(firstName, lastName);
-        
-        if (signature) {
-            showResult(signature);
-        } else {
-            showError(`Signature not found for "${firstName} ${lastName}"`);
-        }
-    });
+            const signature = findSignature(firstName, lastName);
+            
+            if (signature) {
+                showResult(signature);
+            } else {
+                showError(`Signature not found for "${firstName} ${lastName}"`);
+            }
+        });
+    }
 
     // Copy button click
-    copyBtn.addEventListener('click', copyToClipboard);
+    if (copyBtn) {
+        copyBtn.addEventListener('click', copyToClipboard);
+    }
 
-    // Auto-focus first input
-    firstNameInput.focus();
+    // Auto-focus first input if form is visible
+    if (firstNameInput && form && form.style.display !== 'none') {
+        firstNameInput.focus();
+    }
 
-    // Initialize: load signatures and check for URL-based lookup
+    // Initialize: load signatures first, then check for URL-based lookup
     async function init() {
+        // Always load signatures first
         await loadSignatures();
         
+        // Then check if we need to auto-display based on URL
         const nameSlug = getNameFromUrl();
         if (nameSlug) {
             const signature = findSignatureBySlug(nameSlug);
             if (signature) {
                 // Hide the form and show result directly
-                form.style.display = 'none';
+                if (form) {
+                    form.style.display = 'none';
+                }
                 showResult(signature);
             } else {
                 showError(`Signature not found for "${nameSlug.replace(/-/g, ' ')}"`);
@@ -251,5 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Run init immediately
     init();
 });
