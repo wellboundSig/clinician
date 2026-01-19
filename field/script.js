@@ -1,5 +1,5 @@
 // Signature Lookup Script
-// Fetches pre-generated signatures from the EXPORTSIG folder
+// Loads all signatures from JSON and searches case-insensitively
 
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('signatureForm');
@@ -15,29 +15,70 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyText = document.getElementById('copyText');
     const submitBtn = form.querySelector('.submit-btn');
 
-    // Format name for filename lookup (LASTNAME-FIRSTNAME.txt)
-    function formatNameForLookup(firstName, lastName) {
-        // Clean and uppercase the names
-        const cleanFirst = firstName.trim().toUpperCase().replace(/\s+/g, '-');
-        const cleanLast = lastName.trim().toUpperCase().replace(/\s+/g, '-');
-        return `${cleanLast}-${cleanFirst}.txt`;
+    let signaturesData = null;
+
+    // Load signatures JSON on page load
+    async function loadSignatures() {
+        try {
+            const response = await fetch('signatures.json');
+            if (!response.ok) throw new Error('Failed to load signatures');
+            signaturesData = await response.json();
+            console.log(`Loaded ${signaturesData.signatures.length} signatures`);
+        } catch (error) {
+            console.error('Error loading signatures:', error);
+        }
     }
 
-    // Fetch signature file
-    async function fetchSignature(firstName, lastName) {
-        const filename = formatNameForLookup(firstName, lastName);
-        const url = `../EXPORTSIG/${filename}`;
+    // Normalize string for comparison (lowercase, trim, remove extra spaces)
+    function normalize(str) {
+        return str.toLowerCase().trim().replace(/\s+/g, ' ');
+    }
+
+    // Find signature by first and last name (case-insensitive)
+    function findSignature(firstName, lastName) {
+        if (!signaturesData || !signaturesData.signatures) return null;
+
+        const searchFirst = normalize(firstName);
+        const searchLast = normalize(lastName);
         
-        try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Signature not found for ${firstName} ${lastName}`);
+        // Build search key: LASTNAME-FIRSTNAME (normalized for comparison)
+        const searchKey = `${searchLast}-${searchFirst}`;
+
+        for (const sig of signaturesData.signatures) {
+            // Normalize the key for comparison
+            const sigKey = normalize(sig.key);
+            
+            // Exact match
+            if (sigKey === searchKey) {
+                return sig.content.replace(/\|/g, '\n');
             }
-            return await response.text();
-        } catch (error) {
-            console.error('Error fetching signature:', error);
-            throw error;
         }
+
+        // Try partial match (for hyphenated names, etc.)
+        for (const sig of signaturesData.signatures) {
+            const sigKey = normalize(sig.key);
+            const parts = sigKey.split('-');
+            
+            // Check if lastName matches first part and firstName matches last part
+            if (parts.length >= 2) {
+                const sigLast = parts[0];
+                const sigFirst = parts[parts.length - 1];
+                
+                if (sigLast === searchLast && sigFirst === searchFirst) {
+                    return sig.content.replace(/\|/g, '\n');
+                }
+            }
+        }
+
+        // Try fuzzy match - check if names appear anywhere in the key
+        for (const sig of signaturesData.signatures) {
+            const sigKey = normalize(sig.key);
+            if (sigKey.includes(searchFirst) && sigKey.includes(searchLast)) {
+                return sig.content.replace(/\|/g, '\n');
+            }
+        }
+
+        return null;
     }
 
     // Show result
@@ -111,19 +152,23 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Add loading state
-        submitBtn.classList.add('loading');
-        submitBtn.disabled = true;
         hideResults();
 
-        try {
-            const signature = await fetchSignature(firstName, lastName);
-            showResult(signature);
-        } catch (error) {
-            showError(`Signature not found for "${firstName} ${lastName}"`);
-        } finally {
+        // Wait for signatures to load if not yet loaded
+        if (!signaturesData) {
+            submitBtn.classList.add('loading');
+            submitBtn.disabled = true;
+            await loadSignatures();
             submitBtn.classList.remove('loading');
             submitBtn.disabled = false;
+        }
+
+        const signature = findSignature(firstName, lastName);
+        
+        if (signature) {
+            showResult(signature);
+        } else {
+            showError(`Signature not found for "${firstName} ${lastName}"`);
         }
     });
 
@@ -132,4 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Auto-focus first input
     firstNameInput.focus();
+
+    // Pre-load signatures
+    loadSignatures();
 });
