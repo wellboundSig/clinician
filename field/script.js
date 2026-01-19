@@ -1,5 +1,6 @@
 // Signature Lookup Script
 // Loads all signatures from JSON and searches case-insensitively
+// Also supports direct URL access like /field/firstname-lastname
 
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('signatureForm');
@@ -17,15 +18,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let signaturesData = null;
 
+    // Determine base path for loading signatures.json
+    function getSignaturesJsonPath() {
+        const path = window.location.pathname;
+        // Check if we're in a name subdirectory (e.g., /field/judex-belotte/)
+        if (path.match(/\/field\/[^/]+\/?$/)) {
+            return '../signatures.json';
+        }
+        return 'signatures.json';
+    }
+
     // Load signatures JSON on page load
     async function loadSignatures() {
         try {
-            const response = await fetch('signatures.json');
+            const jsonPath = getSignaturesJsonPath();
+            const response = await fetch(jsonPath);
             if (!response.ok) throw new Error('Failed to load signatures');
             signaturesData = await response.json();
             console.log(`Loaded ${signaturesData.signatures.length} signatures`);
+            return true;
         } catch (error) {
             console.error('Error loading signatures:', error);
+            return false;
         }
     }
 
@@ -76,6 +90,37 @@ document.addEventListener('DOMContentLoaded', () => {
             if (sigKey.includes(searchFirst) && sigKey.includes(searchLast)) {
                 return sig.content.replace(/\|/g, '\n');
             }
+        }
+
+        return null;
+    }
+
+    // Find signature by URL slug (firstname-lastname format)
+    function findSignatureBySlug(slug) {
+        if (!signaturesData || !signaturesData.signatures) return null;
+
+        const normalizedSlug = normalize(slug);
+        
+        // Try direct match with LASTNAME-FIRSTNAME format (file naming)
+        for (const sig of signaturesData.signatures) {
+            const sigKey = normalize(sig.key);
+            if (sigKey === normalizedSlug) {
+                return sig.content.replace(/\|/g, '\n');
+            }
+        }
+
+        // Try FIRSTNAME-LASTNAME format (URL friendly)
+        const parts = normalizedSlug.split('-');
+        if (parts.length >= 2) {
+            // Try first-last
+            const firstName = parts[0];
+            const lastName = parts.slice(1).join('-');
+            let result = findSignature(firstName, lastName);
+            if (result) return result;
+
+            // Try last-first (in case someone uses that format)
+            result = findSignature(lastName, firstName);
+            if (result) return result;
         }
 
         return null;
@@ -140,6 +185,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Check if URL contains a name slug
+    function getNameFromUrl() {
+        const path = window.location.pathname;
+        // Match /field/name-here/ or /clinician/field/name-here/
+        const match = path.match(/\/field\/([^/]+)\/?$/);
+        if (match && match[1] && match[1] !== 'index.html') {
+            return match[1];
+        }
+        return null;
+    }
+
     // Form submission
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -178,6 +234,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auto-focus first input
     firstNameInput.focus();
 
-    // Pre-load signatures
-    loadSignatures();
+    // Initialize: load signatures and check for URL-based lookup
+    async function init() {
+        await loadSignatures();
+        
+        const nameSlug = getNameFromUrl();
+        if (nameSlug) {
+            const signature = findSignatureBySlug(nameSlug);
+            if (signature) {
+                // Hide the form and show result directly
+                form.style.display = 'none';
+                showResult(signature);
+            } else {
+                showError(`Signature not found for "${nameSlug.replace(/-/g, ' ')}"`);
+            }
+        }
+    }
+
+    init();
 });
